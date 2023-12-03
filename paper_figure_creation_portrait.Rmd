@@ -1,0 +1,1202 @@
+---
+title: "Colc Paper Figures"
+author: "Ellen Zapata-Webborn"
+date: "`r Sys.Date()`"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+
+# Script used to create figures for the paper (all but Figure 5 - see 'landscape script').
+
+knitr::opts_chunk$set(echo = FALSE,
+                      include = FALSE,
+                      dpi = 300,
+                      fig.height = 3, 
+                      fig.width = 6.5)
+
+library(data.table)
+library(ggplot2)
+library(ggpubr)
+library(cowplot)
+library(monochromeR)
+library(stringr)
+library(RColorBrewer)
+library(ggalluvial)
+
+myFont <- "serif"
+font.size = 13
+my_linewidth <- 0.8
+obs_elec_col <- "#8A51A5"
+pred_elec_col <- "#9AB4D6"
+obs_gas_col <- "#2072B1"
+pred_gas_col <- "#73C8BD"
+
+# Palettes
+savings_kWh_col_elec <- generate_palette(obs_elec_col, modification = "go_both_ways", 
+                                         n_colours = 6, view_palette = FALSE)[2]
+savings_perc_col_elec <- generate_palette(obs_elec_col, modification = "go_both_ways", 
+                                          n_colours = 6, view_palette = FALSE)[3]
+savings_kWh_col_gas <- generate_palette(obs_gas_col, modification = "go_both_ways", 
+                                        n_colours = 6, view_palette = FALSE)[2]
+savings_perc_col_gas <- generate_palette(obs_gas_col, modification = "go_both_ways", 
+                                         n_colours = 6, view_palette = FALSE)[3]
+
+cost_col_elec <- generate_palette(obs_elec_col, modification = "go_both_ways", 
+                                        n_colours = 6, view_palette = FALSE)[2:5]
+cost_col_gas <- generate_palette(obs_gas_col, modification = "go_both_ways", 
+                                        n_colours = 6, view_palette = FALSE)[2:5]
+cost_col_total <- generate_palette("tomato3", modification = "go_both_ways", 
+                                        n_colours = 6, view_palette = FALSE)[2:5]
+
+quintile_col <- generate_palette("darkolivegreen", modification = "go_both_ways", 
+                                        n_colours = 7, view_palette = FALSE)[2:6]
+popularity_col <- brewer.pal(8, "Dark2")[c(3, 1, 2, 6)]
+
+fp_col <- brewer.pal(11, "PiYG")[c(11, 9, 4, 2, 1)]
+
+# Theme
+theme_set(theme_light(base_family = myFont))
+update_geom_defaults("text", list(family = theme_get()$text$family))
+
+```
+
+
+```{r rq1_energy_histograms_elec}
+
+rq1_hist_data <- fread("./analysis_data/rq1_histogram_data.csv")
+rq1_winter_data <- fread("./analysis_data/rq1_winter_sample_means.csv")
+
+rq1_alpha <- 1
+
+# Obs pred histograms
+rq1_elec_obs_pred_hist <- ggplot(rq1_hist_data[fuel == "elec" & 
+                variable %in% c("observed_energy_kWh",
+                                "predicted_energy_kWh")]) + 
+  geom_histogram(stat = "identity",
+                 position = "dodge",
+                 aes(x = x_mid,
+                     y = N,
+                     fill = variable),
+                     alpha = 1,
+               show.legend = FALSE) + 
+  scale_fill_manual(values = c(obs_elec_col,
+                               pred_elec_col)) +
+  xlab("Daily electricity consumption (kWh)") + 
+  ylab("Count") + 
+  guides(fill = guide_legend(reverse = TRUE)) + 
+  xlim(c(0, 30)) +
+  theme(plot.margin = unit(c(0, 0, 0.3, 0), "cm"))
+
+
+# Obs pred boxplots
+rq1_elec_obs_pred_box <- ggplot(rq1_winter_data[fuel == "elec" & 
+                                                  variable %in% c("observed_energy_kWh",
+                                                                 "predicted_energy_kWh")]) + 
+  geom_boxplot(outlier.shape = NA,
+               aes(fill = variable,
+                   x = variable,
+                   ymin = percentile_5_kWh,
+                   lower = lower_quartile_kWh,
+                   middle = median,
+                   upper = upper_quartile_kWh,
+                   ymax = percentile_95_kWh),
+               stat = "identity",
+               width = 0.5,
+               alpha = rq1_alpha,
+               show.legend = TRUE) +
+  scale_fill_manual(values = c(obs_elec_col,
+                               pred_elec_col),
+                    name = "",
+                    labels = c("Observed",
+                               "Predicted")) +
+  ylim(0, 30) +
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank()) +
+    theme(legend.position = "top") +
+  xlab(NULL) + 
+  coord_flip() +
+  theme(plot.margin = unit(c(0, 0, 0, 0), "cm"),
+        legend.margin = margin(0,0,0,0),
+        legend.box.margin = margin(0, -10, -10, -10))
+
+# Savings KWh histograms
+rq1_elec_savings_kWh_hist <- ggplot(rq1_hist_data[fuel == "elec" & 
+                                                 variable == "savings_kWh"]) + 
+  geom_vline(xintercept = 0) + 
+  geom_histogram(stat = "identity",
+                 position = "identity",
+                 aes(x = x_mid,
+                     y = N),
+                 fill = savings_kWh_col_elec) +
+  xlab("Daily electricity reduction (kWh)") + 
+  ylab("Count") + 
+  xlim(-6, 9) +
+  theme(plot.margin = unit(c(0, 0, 0.3, 0), "cm"))
+
+# Savings kWh boxplots
+rq1_elec_savings_kWh_box <- ggplot(rq1_winter_data[fuel == "elec" & 
+                                                 variable == "savings_kWh"]) + 
+  geom_hline(yintercept = 0) + 
+  geom_boxplot(outlier.shape = NA,
+               aes(x = variable,
+                   ymin = percentile_5_kWh,
+                   lower = lower_quartile_kWh,
+                   middle = median,
+                   upper = upper_quartile_kWh,
+                   ymax = percentile_95_kWh),
+               stat = "identity",
+               width = 0.5,
+               alpha = rq1_alpha,
+               fill = savings_kWh_col_elec,
+               show.legend = FALSE) +
+  ylim(-6, 9) +
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank()) +
+  xlab(NULL) + 
+  coord_flip() +
+  theme(plot.margin = unit(c(0, 0, 0, 0), "cm"),
+        legend.margin = margin(0,0,0,0),
+        legend.box.margin = margin(0, -10, -10, -10))
+
+
+# Savings % histograms
+rq1_elec_savings_perc_hist <- ggplot(rq1_hist_data[fuel == "elec" & 
+                                                 variable == "savings_perc"]) + 
+  geom_histogram(stat = "identity",
+                 position = "identity",
+                 aes(x = x_mid,
+                     y = N),
+                 fill = savings_perc_col_elec) +
+  geom_vline(xintercept = 0) + 
+  xlab("Daily electricity reduction (%)") + 
+  ylab("Count") + 
+  xlim(-45, 67.5) +
+  theme(plot.margin = unit(c(0, 0, 0.3, 0), "cm"))
+
+
+# Savings kWh boxplots
+rq1_elec_savings_perc_box <- ggplot(rq1_winter_data[fuel == "elec" & 
+                                                 variable == "savings_perc"]) + #
+  geom_hline(yintercept = 0) + 
+  geom_boxplot(outlier.shape = NA,
+               aes(x = variable,
+                   ymin = percentile_5_kWh,
+                   lower = lower_quartile_kWh,
+                   middle = median,
+                   upper = upper_quartile_kWh,
+                   ymax = percentile_95_kWh),
+               stat = "identity",
+               width = 0.5,
+               alpha = rq1_alpha,
+               fill = savings_perc_col_elec,
+               show.legend = FALSE) +
+  ylim(-45, 67.5) +
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank()) +
+    xlab(NULL) + 
+  coord_flip() +
+  theme(plot.margin = unit(c(0, 0, 0, 0), "cm"))
+
+
+# Combine
+rq1_obs_pred_with_box_elec <- cowplot::plot_grid(rq1_elec_obs_pred_box,
+                                                 rq1_elec_obs_pred_hist,
+                                                 ncol = 1,
+                                                 align = "v",
+                                                 rel_heights = c(1.1, 2))
+
+rq1_savings_kWh_with_box_elec <- plot_grid(rq1_elec_savings_kWh_box,
+                                           rq1_elec_savings_kWh_hist,
+                                           ncol = 1,
+                                           align = "v",
+                                           rel_heights = c(1, 4))
+
+rq1_savings_perc_with_box_elec <- plot_grid(rq1_elec_savings_perc_box,
+                                            rq1_elec_savings_perc_hist,
+                                            ncol = 1,
+                                            align = "v",
+                                            rel_heights = c(1, 4))
+
+rq1_elec_hist <- cowplot::plot_grid(rq1_obs_pred_with_box_elec,
+                                    rq1_savings_kWh_with_box_elec,
+                                    rq1_savings_perc_with_box_elec,
+                                    ncol = 1,
+                                    rel_heights = c(6.2, 5, 5),
+                                    align = "v")
+
+```
+
+
+```{r rq1_energy_histograms_gas}
+
+# Obs pred histograms
+rq1_gas_obs_pred_hist <- ggplot(rq1_hist_data[fuel == "gas" & 
+                variable %in% c("observed_energy_kWh",
+                                "predicted_energy_kWh")]) + 
+  geom_histogram(stat = "identity",
+                 position = "dodge",
+                 aes(x = x_mid,
+                     y = N,
+                     fill = variable),
+                     alpha = 1,
+                 show.legend = FALSE) + 
+  scale_fill_manual(values = c(obs_gas_col,
+                               pred_gas_col)) +
+  xlab("Daily gas consumption (kWh)") + 
+  ylab(NULL) + 
+  guides(fill = guide_legend(reverse = TRUE)) + 
+  xlim(0, 150) +
+  theme(plot.margin = unit(c(0, 0, 0.3, 0), "cm"))
+
+
+# Obs pred boxplots
+rq1_gas_obs_pred_box <- ggplot(rq1_winter_data[fuel == "gas" & 
+                                                  variable %in% c("observed_energy_kWh",
+                                                                 "predicted_energy_kWh")]) + 
+  geom_boxplot(outlier.shape = NA,
+               aes(fill = variable,
+                   x = variable,
+                   ymin = percentile_5_kWh,
+                   lower = lower_quartile_kWh,
+                   middle = median,
+                   upper = upper_quartile_kWh,
+                   ymax = percentile_95_kWh),
+               stat = "identity",
+               width = 0.5,
+               alpha = rq1_alpha,
+               show.legend = TRUE) +
+  scale_fill_manual(values = c(obs_gas_col,
+                               pred_gas_col),
+                    name = "",
+                    labels = c("Observed",
+                               "Predicted")) +
+  ylim(0, 150) +
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank()) +
+  theme(legend.position = "top") +
+  xlab(NULL) + 
+  coord_flip() +
+  theme(plot.margin = unit(c(0, 0, 0, 0), "cm"),
+        legend.margin = margin(0,0,0,0),
+        legend.box.margin = margin(0, -10, -10, -10))
+
+
+# Savings KWh histograms
+rq1_gas_savings_kWh_hist <- ggplot(rq1_hist_data[fuel == "gas" & 
+                                                 variable == "savings_kWh"]) + 
+  geom_vline(xintercept = 0) + 
+  geom_histogram(stat = "identity",
+                 position = "identity",
+                 aes(x = x_mid,
+                     y = N),
+                 fill = savings_kWh_col_gas) +
+  xlab("Daily gas reduction (kWh)") + 
+  ylab(NULL) +
+  theme(plot.margin = unit(c(0, 0, 0.3, 0), "cm"))
+
+
+# Savings kWh boxplots
+rq1_gas_savings_kWh_box <- ggplot(rq1_winter_data[fuel == "gas" & 
+                                                 variable == "savings_kWh"]) + 
+  geom_hline(yintercept = 0) + 
+  geom_boxplot(outlier.shape = NA,
+               aes(x = variable,
+                   ymin = percentile_5_kWh,
+                   lower = lower_quartile_kWh,
+                   middle = median,
+                   upper = upper_quartile_kWh,
+                   ymax = percentile_95_kWh),
+               stat = "identity",
+               width = 0.5,
+               alpha = rq1_alpha,
+               fill = savings_kWh_col_gas,
+               show.legend = FALSE) +
+  ylim(-20, 40) +
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank()) +
+  xlab("") + 
+  coord_flip() +
+  theme(plot.margin = unit(c(0, 0, 0, 0), "cm")) 
+
+# Savings % histograms
+rq1_gas_savings_perc_hist <- ggplot(rq1_hist_data[fuel == "gas" & 
+                                                 variable == "savings_perc"]) + 
+  geom_histogram(stat = "identity",
+                 position = "identity",
+                 aes(x = x_mid,
+                     y = N),
+                 fill = savings_perc_col_gas) +
+  geom_vline(xintercept = 0) + 
+  xlab("Daily gas reduction (%)") + 
+  ylab("") + 
+  xlim(-45, 90) +
+  theme(plot.margin = unit(c(0, 0, 0.3, 0), "cm"))
+
+
+# Savings perc boxplots
+rq1_gas_savings_perc_box <- ggplot(rq1_winter_data[fuel == "gas" & 
+                                                 variable == "savings_perc"]) + 
+  geom_hline(yintercept = 0) + 
+  geom_boxplot(outlier.shape = NA,
+               aes(x = variable,
+                   ymin = percentile_5_kWh,
+                   lower = lower_quartile_kWh,
+                   middle = median,
+                   upper = upper_quartile_kWh,
+                   ymax = percentile_95_kWh),
+               stat = "identity",
+               width = 0.5,
+               alpha = rq1_alpha,
+               fill = savings_perc_col_gas,
+               show.legend = FALSE) +
+  ylim(-45, 90) +
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank()) +
+    xlab("") + 
+  coord_flip() +
+  theme(plot.margin = unit(c(0, 0, 0, 0), "cm")) 
+
+# Combine
+rq1_obs_pred_with_box_gas <- cowplot::plot_grid(rq1_gas_obs_pred_box,
+                   rq1_gas_obs_pred_hist,
+                   ncol = 1,
+                   align = "v",
+                   rel_heights = c(1.1, 2))
+
+rq1_savings_kWh_with_box_gas <- plot_grid(rq1_gas_savings_kWh_box,
+                                           rq1_gas_savings_kWh_hist,
+                                           
+                   ncol = 1,
+                   align = "v",
+                   rel_heights = c(1, 4))
+
+rq1_savings_perc_with_box_gas <- plot_grid(rq1_gas_savings_perc_box,
+                                           rq1_gas_savings_perc_hist,
+                                           
+                   ncol = 1,
+                   align = "v",
+                   rel_heights = c(1, 4))
+
+rq1_gas_hist <- cowplot::plot_grid(rq1_obs_pred_with_box_gas,
+                                    rq1_savings_kWh_with_box_gas,
+                                    rq1_savings_perc_with_box_gas,
+                                    ncol = 1,
+                                    rel_heights = c(6.2, 5, 5))
+
+rq1_all_hist <- plot_grid(rq1_elec_hist,
+                          rq1_gas_hist,
+                          ncol = 2)
+
+
+abstract_fig <- plot_grid(rq1_savings_kWh_with_box_elec,
+                          rq1_savings_kWh_with_box_gas,
+                          nrow = 1)
+
+```
+
+```{r include = TRUE, fig.height = 8}
+# Figure 1
+rq1_all_hist
+```
+
+```{r graphical_abstract}
+
+rq1_elec_savings_kWh_hist_abstract <- rq1_elec_savings_kWh_hist + 
+  theme(axis.text = element_text(size = 30),
+        axis.title = element_text(size = 32))
+
+rq1_savings_kWh_with_box_elec_for_abstract <- plot_grid(rq1_elec_savings_kWh_box,
+                                           rq1_elec_savings_kWh_hist_abstract,
+                                           ncol = 1,
+                                           align = "v",
+                                           rel_heights = c(1, 4))
+
+rq1_gas_savings_kWh_hist_abstract <- rq1_gas_savings_kWh_hist + 
+  theme(axis.text = element_text(size = 30),
+        axis.title = element_text(size = 32)) + 
+  ylab("Count")
+
+rq1_savings_kWh_with_box_gas_for_abstract <- plot_grid(rq1_gas_savings_kWh_box,
+                                           rq1_gas_savings_kWh_hist_abstract,
+                                           ncol = 1,
+                                           align = "v",
+                                           rel_heights = c(1, 4))
+
+```
+
+```{r include = TRUE, fig.height = 5, fig.width = 7}
+rq1_savings_kWh_with_box_elec_for_abstract
+```
+
+```{r include = TRUE, fig.height = 5, fig.width = 7}
+rq1_savings_kWh_with_box_gas_for_abstract
+```
+
+
+
+```{r rq5_winter_costs, eval=TRUE}
+
+rq5_winter <- fread("./analysis_data/rq5_winter_cost_stats.csv") 
+
+# Get total costs
+rq5_winter_long <- melt(rq5_winter[, 1:8], id.vars = c("fuel", "variable"))
+rq5_winter_wide <- dcast(rq5_winter_long, 
+                         variable + variable.1 ~ fuel , value.var = "value")
+rq5_winter_wide[, total := elec + gas]
+rq5_winter_wide <- rq5_winter_wide[variable != "savings_perc_2022_23"]
+
+# Incorporate Govt subsidy
+subsidy <- rq5_winter_wide[variable == "observed_energy_kWh_2022_23"]
+
+# split is approximately 40% elec bill, 60% gas bill for the total bill
+subsidy[, `:=`(variable = "after_subsidy_2022_23",
+               elec = elec - 160/6,
+               gas = gas - 240/6, 
+               total = total - 400/6)]
+
+rq5_winter_wide <- rbind(rq5_winter_wide, subsidy)
+
+rq5_winter_with_total <- melt(rq5_winter_wide, id.vars = c("variable", "variable.1"))
+setnames(rq5_winter_with_total, "variable.2", "fuel")
+rq5_winter_with_total <- dcast(rq5_winter_with_total,
+                               fuel + variable ~ variable.1,
+                               value.var = "value")
+
+
+rq5_winter_with_total[, variable := factor(variable,
+                                 levels = 
+                                   c("observed_energy_kWh_2021_22",
+                                     "predicted_energy_kWh_2022_23",
+                                     "observed_energy_kWh_2022_23",
+                                     "after_subsidy_2022_23",
+                                     "savings_kWh_2022_23"))]
+
+costs_total_plot_limits <- c(-15, 625)
+
+
+#### ELEC ####
+rq5_winter_costs_elec <- ggplot(rq5_winter_with_total[fuel == "elec" & 
+                                                        variable != "savings_kWh_2022_23"]) + 
+  geom_boxplot(aes(x = variable,
+                   ymin = percentile_5_kWh,
+                   lower = lower_quartile_kWh,
+                   middle = median, 
+                   upper = upper_quartile_kWh,
+                   ymax = percentile_95_kWh,
+                   fill = variable),
+               stat = "identity",
+               show.legend = FALSE) + 
+  geom_text(aes(x = variable,
+                y = median,
+                label = paste0("£", round(median))),
+            vjust = -0.4) + 
+  geom_text(aes(x = variable,
+                y = percentile_95_kWh,
+                label = paste0("£", round(percentile_95_kWh))),
+            vjust = -0.3) + 
+  theme(legend.position = "none") + 
+  xlab("Electricity Bills") + 
+  ylab("Average winter monthly cost (£)") +
+  scale_fill_manual(values = cost_col_elec) + 
+  scale_x_discrete(labels = c("Observed \n2021/22",
+                              "Prediceted \n2022/23",
+                              "Observed \n2022/23",
+                              "Observed \nwith subsidy \n2022/23")) +
+  ylim(costs_total_plot_limits) + 
+  geom_hline(yintercept = 0) +
+  theme(plot.margin = unit(c(0, 0, 0, 0), "cm"))
+
+#### GAS ####
+rq5_winter_costs_gas <- ggplot(rq5_winter_with_total[fuel == "gas" & 
+                                                        variable != "savings_kWh_2022_23"]) + 
+  geom_boxplot(aes(x = variable,
+                   ymin = percentile_5_kWh,
+                   lower = lower_quartile_kWh,
+                   middle = median, 
+                   upper = upper_quartile_kWh,
+                   ymax = percentile_95_kWh,
+                   fill = variable),
+               stat = "identity",
+               show.legend = FALSE) + 
+  geom_text(aes(x = variable,
+                y = median,
+                label = paste0("£", round(median))),
+            vjust = -0.4) + 
+  geom_text(aes(x = variable,
+                y = percentile_95_kWh,
+                label = paste0("£", round(percentile_95_kWh))),
+            vjust = -0.4) + 
+  theme(legend.position = "none") + 
+  xlab("Gas Bills") + 
+  ylab(NULL) +
+  scale_fill_manual(values = cost_col_gas) + 
+  scale_x_discrete(labels = c("Observed \n2021/22",
+                              "Prediceted \n2022/23",
+                              "Observed \n2022/23",
+                              "Observed \nwith subsidy \n2022/23")) +
+  ylim(costs_total_plot_limits) + 
+  geom_hline(yintercept = 0) +
+  theme(plot.margin = unit(c(0, 0, 0, 0), "cm"),
+        axis.text.y = element_blank())
+
+#### Total ####
+rq5_winter_costs_total <- ggplot(rq5_winter_with_total[fuel == "total" & 
+                                                        variable != "savings_kWh_2022_23"]) + 
+  geom_boxplot(aes(x = variable,
+                   ymin = percentile_5_kWh,
+                   lower = lower_quartile_kWh,
+                   middle = median, 
+                   upper = upper_quartile_kWh,
+                   ymax = percentile_95_kWh,
+                   fill = variable),
+               stat = "identity",
+               show.legend = FALSE) + 
+  geom_text(aes(x = variable,
+                y = median,
+                label = paste0("£", round(median))),
+            vjust = -0.4) + 
+  geom_text(aes(x = variable,
+                y = percentile_95_kWh,
+                label = paste0("£", round(percentile_95_kWh))),
+            vjust = -0.4) + 
+  theme(legend.position = "none") + 
+  xlab("Total Bills") + 
+  ylab(NULL) +
+  scale_fill_manual(values = cost_col_total) + 
+  scale_x_discrete(labels = c("Observed \n2021/22",
+                              "Prediceted \n2022/23",
+                              "Observed \n2022/23",
+                              "Observed \nwith subsidy \n2022/23")) +
+  ylim(costs_total_plot_limits) + 
+  geom_hline(yintercept = 0) +
+  theme(plot.margin = unit(c(0, 0, 0, 0), "cm"),
+        axis.text.y = element_blank())
+
+
+rq5_costs <- cowplot::plot_grid(rq5_winter_costs_elec,
+                                rq5_winter_costs_gas,
+                                rq5_winter_costs_total,
+                                nrow = 1,
+                                align = "h",
+                                rel_widths = c(1.125, 1, 1))
+
+```
+
+```{r include = TRUE, fig.height = 4, fig.width =8.5, eval=TRUE}
+# Figure 2
+rq5_costs
+```
+
+```{r rq5_cost_savings_table_data}
+
+rq5_winter_savings <- melt(rq5_winter_with_total,
+                           id.vars = c("fuel", "variable"))
+
+rq5_winter_savings <- dcast(rq5_winter_savings,
+                            fuel + variable.1 ~ variable,
+                            value.var = c("value"))
+
+rq5_winter_savings[, `:=`(pred_increase_from_prev = round(predicted_energy_kWh_2022_23 - 
+                            observed_energy_kWh_2021_22,2),
+                          obs_increase_from_prev = round(observed_energy_kWh_2022_23 - 
+                            observed_energy_kWh_2021_22,2),
+                          bill_savings = round(predicted_energy_kWh_2022_23 - 
+                            observed_energy_kWh_2022_23,2))]
+
+```
+
+```{r rq4_action_popularity, eval = TRUE}
+
+rq4_action_popularity <- fread("./analysis_data/rq4_overall_action_popularity.csv")
+
+action_popularity_questions <-
+  data.table(
+    variable = c(paste0("A5_", 1:16),
+                 "A2", "A7"),
+    question = c(
+      "Switch off lights in unused rooms",
+      "Put more clothes on rather than more heating",
+      "Turn heating down/off when out",
+      "Use standalone heater rather than more heating",
+      "Use electric blanket/hot water bottle rather than more heating",
+      "Turn down radiators in unused rooms",
+      "Turn down radiators in used rooms",
+      "Run washing machine at full rather than part load",
+      "Run washing machine at 30 degrees or lower",
+      "Dry clothes without a tumble dryer",
+      "Turn appliances off standby when not in use",
+      "Close curtains/blinds at night",
+      "Shower rather than bath",
+      "Take short rather than long showers",
+      "Use dishwasher rather than washing up",
+      "Avoid using the cooker/oven for main meal",
+      "Any living spaces not normally heated*",
+      "Turn off the heating when absent for more than a day**"
+    )
+  )
+
+rq4_action_popularity <- action_popularity_questions[rq4_action_popularity,
+                                                     on = "variable"]
+
+rq4_action_popularity[perc > 60, popularity := "Very popular"]
+rq4_action_popularity[perc > 40 & perc <= 60, popularity := "Quite popular"]
+rq4_action_popularity[perc > 20 & perc <= 40, popularity := "Not very popular"]
+rq4_action_popularity[perc <= 20, popularity := "Very unpopular"]
+rq4_action_popularity[, popularity := factor(popularity,
+                                             levels = c("Very popular",
+                                                        "Quite popular",
+                                                        "Not very popular",
+                                                        "Very unpopular"))]
+
+rq4_action_popularity_plot <- ggplot(rq4_action_popularity[variable != "A12"],
+                                aes(x = reorder(question, perc),
+                                    y = perc,
+                                    fill = popularity)) + 
+  geom_bar(stat = "identity", 
+           show.legend = FALSE) + 
+  scale_fill_manual(values = popularity_col) +
+  xlab(NULL) + 
+  ylab("Percent who 'Always' take the action*") +
+  coord_flip() +
+  theme(panel.border = element_blank())
+
+
+```
+
+
+```{r include = TRUE, fig.height=4.5, eval=TRUE}
+# Figure 4
+rq4_action_popularity_plot
+```
+
+```{r rq4_n_action_responses, eval=TRUE}
+
+rq4_n_action_responses_by_consumer_percentile <- fread("./analysis_data/rq4_n_behaviours_by_saver_percentile.csv")
+
+rq4_n_action_responses_by_consumer_percentile[value == "Not applicable, cannot do this", 
+                                              value := "Not applicable,\ncannot do this"]
+rq4_n_action_responses_by_consumer_percentile[value == "A lot less", 
+                                              value := "A lot\nless"]
+rq4_n_action_responses_by_consumer_percentile[value == "A little less", 
+                                              value := "A little\nless"]
+rq4_n_action_responses_by_consumer_percentile[value == "About the same", 
+                                              value := "About\nthe same"]
+rq4_n_action_responses_by_consumer_percentile[value == "A little more", 
+                                              value := "A little\nmore"]
+rq4_n_action_responses_by_consumer_percentile[value == "A lot more", 
+                                              value := "A lot\nmore"]
+
+
+rq4_n_action_responses_by_consumer_percentile[, value := factor(
+  value,
+  levels =
+    c(
+      "Not applicable,\ncannot do this",
+      "A lot\nless",
+      "A little\nless",
+      "About\nthe same",
+      "A little\nmore",
+      "A lot\nmore"
+    )
+)]
+
+rq4_action_responses <- ggplot(rq4_n_action_responses_by_consumer_percentile[!is.na(value)],
+                               aes(x = value,
+                                   y = mean_n_actions,
+                                   fill = factor(saving_perc_quintile))) + 
+  geom_bar(stat = "identity", position = "dodge") + 
+  scale_fill_manual(values = quintile_col) +
+  xlab("Response") +
+  ylab("Mean number of responses") + 
+  labs(fill = "Energy reduction quintile \n(5 reduced by the most)") + 
+  theme(legend.position = "top") 
+
+```
+
+
+```{r include = TRUE, fig.height=4, eval=TRUE}
+# Figure D.1
+rq4_action_responses
+```
+
+
+```{r thermostatSettings}
+
+thermostat <- fread("./analysis_data/rq4_thermostat_stats.csv")
+
+thermostat[variable == "S1_A5_degC", variable := "Sign-up survey"]
+thermostat[variable == "S3_A1_corr_C", variable := "2023 survey"]
+thermostat[variable == "deltaSetting", variable := "Difference"]
+
+
+rq4_thermostat_temp_plot <- ggplot(thermostat[saving_perc_quintile %in% 1:5 & 
+                                           variable %in% c("Sign-up survey",
+                                                           "2023 survey")],
+                              aes(x = factor(variable, levels = c("Sign-up survey",
+                                                                  "2023 survey")),
+                                  y = mean,
+                                  fill = factor(saving_perc_quintile))) + 
+  geom_bar(stat = "identity", position = "dodge") + 
+  scale_fill_manual(values = quintile_col) + 
+  theme(legend.position = "none",
+        plot.margin = unit(c(0, 0.2, 0, 0), "cm"),
+        axis.ticks.x = element_blank()) +
+  labs(fill = "Energy reduction quintile (5 reduced by the most)") +
+  xlab(NULL) +
+  ylab("Mean thermostat setting (\u00B0C)") + 
+  geom_text(aes(label = format(round(mean, 1), nsmall = 1)),
+            position = position_dodge(width = 0.9),
+            vjust = -0.8) + 
+  ylim(0, 21)
+
+rq4_thermostat_change_plot <- ggplot(thermostat[saving_perc_quintile %in% 1:5 & 
+                                           variable == "Difference"],
+                              aes(x = variable,
+                                  y = mean,
+                                  fill = factor(saving_perc_quintile))) + 
+  geom_bar(stat = "identity", position = "dodge") + 
+  scale_fill_manual(values = quintile_col) + 
+  theme(legend.position = "none",
+        plot.margin = unit(c(0, 0, 0, 0), "cm"),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  ylab("Mean change in thermostat setting (\u00B0C)") + 
+  geom_text(aes(label = format(round(mean, 1), nsmall = 1)),
+            position = position_dodge(width = 0.9),
+            vjust = 1.1) + 
+  ylim(-2, 0)
+  
+thermostat_legend <- get_legend(rq4_thermostat_temp_plot +
+                                  theme(legend.position = "top"))
+
+thermostat_bars <- plot_grid(rq4_thermostat_temp_plot,
+                             rq4_thermostat_change_plot,
+                             nrow = 1,
+                             rel_widths = c(2, 1))
+
+thermostat_plot <- plot_grid(thermostat_legend,
+                             thermostat_bars,
+                             nrow = 2,
+                             rel_heights = c(1, 10))
+
+```
+
+
+```{r include = TRUE, fig.height = 3.5, fig.width = 7}
+# Figure 6
+thermostat_plot
+```
+
+
+```{r energy_vs_temperature}
+
+energy_vs_temp <- fread("./analysis_data/rq2_median_energy_by_temp_bin_saver_quintile.csv")
+
+wide_energy_vs_temp <- dcast(energy_vs_temp,
+                             fuel + saving_perc_quintile + bin + mean_temp ~ variable,
+                             value.var = "median_energy")
+wide_energy_vs_temp[, savings_perc := savings_kWh / predicted_energy_kWh * 100]
+long_energy_vs_temp <- melt(wide_energy_vs_temp,
+                            id.vars = c("fuel", "saving_perc_quintile", 
+                                        "bin", "mean_temp"),
+                            measure.vars = c("observed_energy_kWh",
+                                             "predicted_energy_kWh",
+                                             "savings_kWh",
+                                             "savings_perc"))
+
+
+# Plots
+title_size <- 10
+label_pos <- -0.1
+
+pred_energy_temp <- ggplot(energy_vs_temp[variable == "predicted_energy_kWh" & 
+                                            fuel == "gas"],
+                           aes(x = mean_temp,
+                               y = median_energy,
+                               colour = factor(saving_perc_quintile))) + 
+  scale_colour_manual(values = quintile_col) + 
+  geom_point() + 
+  geom_line(size = 1) + 
+  geom_text(data = energy_vs_temp[variable == "predicted_energy_kWh" & 
+                                            fuel == "gas" & 
+                                    bin == 21],
+            aes(x = label_pos, 
+                y = median_energy,
+                label = saving_perc_quintile),
+            show.legend = FALSE) + 
+  geom_hline(yintercept = 0) + 
+  labs(colour =  "Energy reduction quintile (5 reduced by the most)  ") +
+  theme(legend.position = "none",
+        plot.title = element_text(size = title_size)) + 
+  ylim(0, 80) + 
+  xlab("Temperature (\u00B0C)") +
+  ylab("Median daily gas consumption") + 
+  ggtitle("Predicted (kWh)")
+
+obs_energy_temp <- ggplot(energy_vs_temp[variable == "observed_energy_kWh" & 
+                                            fuel == "gas"],
+                           aes(x = mean_temp,
+                               y = median_energy,
+                               colour = factor(saving_perc_quintile))) + 
+  scale_colour_manual(values = quintile_col) + 
+  geom_point() + 
+  geom_line(size = 1) + 
+  geom_text(data = energy_vs_temp[variable == "observed_energy_kWh" & 
+                                            fuel == "gas" & 
+                                    bin == 21],
+            aes(x = label_pos, 
+                y = median_energy,
+                label = saving_perc_quintile)) + 
+  theme(legend.position = "none",
+        plot.title = element_text(size = title_size),
+        axis.text.y = element_blank()) + 
+  geom_hline(yintercept = 0) + 
+  ylim(0, 80) + 
+  xlab("Temperature (\u00B0C)") +
+  ylab(NULL) + 
+  ggtitle("Observed (kWh)")
+
+save_kWh_energy_temp <- ggplot(energy_vs_temp[variable == "savings_kWh" & 
+                                            fuel == "gas"],
+                           aes(x = mean_temp,
+                               y = median_energy,
+                               colour = factor(saving_perc_quintile))) + 
+  scale_colour_manual(values = quintile_col) + 
+  geom_point() + 
+  geom_line(size = 1)  + 
+  geom_text(data = energy_vs_temp[variable == "savings_kWh" & 
+                                            fuel == "gas" & 
+                                    bin == 21],
+            aes(x = label_pos, 
+                y = median_energy,
+                label = saving_perc_quintile)) + 
+  geom_hline(yintercept = 0) + 
+  theme(legend.position = "none",
+        plot.title = element_text(size = title_size)) +  
+  ylim(-10, 30) + 
+  xlab("Temperature (\u00B0C)") +  
+  ylab("Median daily gas reduction") + 
+  ggtitle("Reduction (kWh)")
+
+
+save_perc_energy_temp <- ggplot(long_energy_vs_temp[variable == "savings_perc" & 
+                                            fuel == "gas"],
+                           aes(x = mean_temp,
+                               y = value,
+                               colour = factor(saving_perc_quintile))) + 
+  scale_colour_manual(values = quintile_col) + 
+  geom_point() + 
+  geom_line(size = 1)  + 
+  geom_text(data = long_energy_vs_temp[variable == "savings_perc" & 
+                                            fuel == "gas" & 
+                                    bin == 21],
+            aes(x = label_pos, 
+                y = value,
+                label = saving_perc_quintile)) + 
+  geom_hline(yintercept = 0) + 
+  theme(legend.position = "none",
+        plot.title = element_text(size = title_size),
+        axis.text.y = element_blank()) + 
+  ylim(-20, 60) +
+  xlab("Temperature (\u00B0C)") +
+  ylab(NULL) + 
+  ggtitle("Reduction (%)")
+
+
+energy_temp_legend <- get_legend(pred_energy_temp +
+                                   theme(legend.position = "top"))
+
+energy_temp_4_plots <- plot_grid(pred_energy_temp,
+                              obs_energy_temp,
+                              save_kWh_energy_temp,
+                              save_perc_energy_temp,
+                              nrow = 1,
+                              rel_widths = c(1.15, 1, 1.15, 1))
+
+energy_temp_plot <- plot_grid(energy_temp_legend,
+                              energy_temp_4_plots,
+                              nrow = 2,
+                              rel_heights = c(1,10))
+
+
+```
+
+```{r include = TRUE, fig.width = 7, fig.height = 4}
+# Figure 7
+energy_temp_plot
+```
+
+
+```{r fuelPovertySankey, eval = FALSE}
+
+
+change_in_fp <- fread("./analysis_data/rq6_change_in_financial_wellbeing.csv")
+
+fp_indiv <- data.table(id = 1:662,
+                       survey = rep(1, 662),
+                       financial_wellbeing = "Living comfortably")
+fp_indiv <- rbind(fp_indiv,
+                  data.table(id = 1:662,
+                       survey = rep(2, 662),
+                       financial_wellbeing = "Living comfortably"))
+
+
+wellbeing_cat <- c("Living comfortably",
+                   "Doing alright",
+                   "Just about getting by",
+                   "Finding it quite difficult",
+                   "Finding it very difficult")
+
+fp_indiv <- data.table(id = numeric(),
+                       survey = numeric(),
+                       financial_wellbeing = character())
+last_id <- 0
+for(i in 1:5) {
+  for(j in 1:5) {
+    w1 <- wellbeing_cat[i]
+    w2 <- wellbeing_cat[j]
+    if(length(change_in_fp[prev_financial_wellbeing == w1 &
+                                             financial_wellbeing == w2, N]) > 0) {
+      next_last_id <- last_id + change_in_fp[prev_financial_wellbeing == w1 &
+                                             financial_wellbeing == w2, N]
+      fp_indiv <- rbind(fp_indiv,
+                        data.table(id = (last_id + 1):next_last_id,
+                                   survey = 1,
+                                   financial_wellbeing = w1))
+      fp_indiv <- rbind(fp_indiv,
+                        data.table(id = (last_id + 1):next_last_id,
+                                   survey = 2,
+                                   financial_wellbeing = w2))
+      last_id <- next_last_id
+    }
+  }
+}
+
+
+fp_indiv[, financial_wellbeing := factor(financial_wellbeing,
+                                                  levels = c("Living comfortably",
+                                                             "Doing alright",
+                                                             "Just about getting by",
+                                                             "Finding it quite difficult",
+                                                             "Finding it very difficult"))]
+
+
+fp_sankey2 <- ggplot(fp_indiv,
+                    aes(alluvium = id,
+                        x = survey,
+                        stratum = financial_wellbeing)) + 
+  geom_flow(aes(fill = financial_wellbeing)) + 
+  geom_stratum(aes(fill = financial_wellbeing)) + 
+  geom_text(stat = "stratum",
+            aes(label = after_stat(stratum)))  + 
+  labs(fill = "Financial wellbeing") + 
+  scale_fill_manual(values = fp_col) + 
+  theme_void() + 
+  theme(legend.position = "top")
+
+
++ 
+  scale_x_discrete(limits = c("prev_financial_wellbeing",
+                              "financial_wellbeing"),
+                   expand = c(0.15, 0.05)) + 
+  theme(legend.position = "top") + 
+  labs(fill = "Financial wellbeing") + 
+  scale_fill_manual(values = fp_col) + 
+  theme_void()
+
+summary_change_in_fp <- fp_indiv[, .N, keyby = .(survey, financial_wellbeing)]
+summary_change_in_fp[, perc := round(N / change_in_fp[, sum(N)] * 100, 1)]
+```
+
+
+```{r underheating}
+
+underheating_counts <- fread("./analysis_data/rq6_fuel_poverty_underheating_counts.csv")
+underheating_counts[group == "big_saver", group := "Quintile 5"]
+underheating_counts[group == "other", group := "Quintiles 1-4"]
+underheating_counts[variable == "Mould or damp" & subgroup == TRUE,
+                    subgroup := "Mould/damp/condensation issues"]
+underheating_counts[variable == "Mould or damp" & subgroup == FALSE,
+                    subgroup := "No mould/damp/condensation issues"]
+
+underheating_counts[variable == "Substantial mould" & subgroup == TRUE,
+                    subgroup := "Substantial mould"]
+underheating_counts[variable == "Substantial mould" & subgroup == FALSE,
+                    subgroup := "No substantial mould"]
+
+underheating_counts[, subgroup := factor(subgroup,
+                                         levels = c("High",
+                                                    "Low", 
+                                                    "Very or fairly easy",
+                                                    "Neither easy nor difficult",
+                                                    "Very or fairly difficult",
+                                                    "Can keep comfortably warm",
+                                                    "Can't keep comfortably warm",
+                                                    "No mould/damp/condensation issues",
+                                                    "Mould/damp/condensation issues",
+                                                    "No substantial mould",
+                                                    "Substantial mould"))]
+
+
+fw_barplot_underheating <- function(var, 
+                                    x_text = FALSE,
+                                    palette,
+                                    vals,
+                                    title = NA) {
+  
+  colours <- brewer.pal(9, palette)[vals]
+  if(is.na(title)) {title = var}
+  
+  p <- ggplot(underheating_counts[variable == var],
+                 aes(x = group,
+                     y = perc)) +
+  geom_bar(stat = "identity",
+           aes(fill = subgroup)) + 
+  geom_text(aes(label = paste0(format(round(perc, 1), nsmall = 1), "%"),
+                group = subgroup),
+            position = position_stack(),
+            hjust = 1) + 
+  xlab(title) + 
+  coord_flip() + 
+  theme(legend.position = "top",
+        plot.margin = unit(c(t = 0, r = 0, b = 0.5, l = 0), "cm"),
+        legend.margin = margin(5,0,0,0),
+        legend.box.margin = margin(0, -10, -10, -10),
+        axis.title.y = element_text(angle = 0)) + 
+    labs(fill = NULL) + 
+    scale_fill_manual(values = colours) + 
+    guides(fill = guide_legend(reverse = TRUE))
+  
+  if(x_text == FALSE) {
+    p <- p + theme(axis.text.x = element_blank()) + 
+      ylab(NULL)
+  } else {
+    p <- p + ylab ("Percent")  
+  }
+  return(p)
+}
+
+fw_plot <- fw_barplot_underheating("Financial wellbeing",
+                                    palette = "Greys",
+                                    vals = c(2, 6),
+                                   title = "Financial\nwellbeing")
+
+ease_meeting_costs_plot <- fw_barplot_underheating("Ease of meeting heating costs",
+                                                    palette = "Greys",
+                                                   vals = c(2, 4, 6),
+                                                   title = "Ease of meeting\nheating costs")
+
+keep_warm_plot <- fw_barplot_underheating("Keeping comfortably warm",
+                                          palette = "Greys",
+                                          vals = c(2, 6),
+                                          title = "Keeping\ncomfortably\nwarm")
+
+mould_plot <- fw_barplot_underheating("Mould or damp",
+                                      palette = "Greys",
+                                      vals = c(2, 6),
+                                      title = "Mould\nor\ndamp")
+
+substantial_mould_plot <- fw_barplot_underheating("Substantial mould",
+                                          palette = "Greys",
+                                          vals = c(2, 6),
+                                          title = "Substantial\nmould",
+                                          x_text = TRUE)
+
+underheating_plot <- plot_grid(fw_plot,
+                               ease_meeting_costs_plot,
+                               keep_warm_plot,
+                               mould_plot,
+                               substantial_mould_plot,
+                               nrow = 5,
+                               align = "v",
+                               rel_heights = c(1,1,1,1,1.2))
+
+  
+```
+
+```{r include = TRUE, fig.width = 6.5, fig.height = 6}
+# Figure 8
+underheating_plot
+```
+
+
+
+```{r finance_wellbeing_price_elasticity}
+
+fin_wellbeing_elast <- fread("./analysis_data/rq7_avg_financial_wellbeing_price_elast.csv")
+fin_wellbeing_elast[E1 == "Living comfortably", 
+                    E1 := "Living\ncomfortably"]
+fin_wellbeing_elast[E1 == "Doing alright", 
+                    E1 := "Doing\nalright"]
+fin_wellbeing_elast[E1 == "Just about getting by", 
+                    E1 := "Just about\ngetting by"]
+fin_wellbeing_elast[E1 == "Finding it quite difficult", 
+                    E1 := "Finding it\nquite\ndifficult"]
+fin_wellbeing_elast[E1 == "Finding it very difficult", 
+                    E1 := "Finding it\nvery\ndifficult"]
+fin_wellbeing_elast[, E1 := factor(E1, 
+                                   levels = c("Living\ncomfortably",
+                                              "Doing\nalright",
+                                              "Just about\ngetting by",
+                                              "Finding it\nquite\ndifficult",
+                                              "Finding it\nvery\ndifficult"))]
+
+fin_wellbeing_elast_elec <- ggplot(fin_wellbeing_elast[fuel == "elec"]) + 
+  geom_hline(yintercept = 0) +
+  geom_boxplot(aes(x = E1,
+                   ymin = low_iqr,
+                   lower = low_iqr,
+                   middle = median_elasticity,
+                   upper = up_iqr,
+                   ymax = up_iqr,
+                   fill = E1),
+               stat = "identity",
+               show.legend = FALSE) + 
+  geom_text(aes(x = E1,
+                y = median_elasticity,
+                label = round(median_elasticity, 3)),
+            vjust = -0.4) + 
+  xlab(NULL) + 
+  ylab("Electricity price elasticity") + 
+  scale_fill_manual(values = generate_palette(obs_elec_col, 
+                                              modification = "go_both_ways", 
+                                              n_colours = 6)[1:5]) +
+  ylim(c(-0.25, 0.05)) +
+  theme(plot.margin = unit(c(0, 0, 0, 0.5), "cm"))
+  
+fin_wellbeing_elast_gas <- ggplot(fin_wellbeing_elast[fuel == "gas"]) + 
+  geom_hline(yintercept = 0) +
+  geom_boxplot(aes(x = E1,
+                   ymin = low_iqr,
+                   lower = low_iqr,
+                   middle = median_elasticity,
+                   upper = up_iqr,
+                   ymax = up_iqr,
+                   fill = E1),
+               stat = "identity",
+               show.legend = FALSE) + 
+  geom_text(aes(x = E1,
+                y = median_elasticity,
+                label = round(median_elasticity, 3)),
+            vjust = -0.4) + 
+  xlab(NULL) + 
+  ylab("Gas price elasticity") + 
+  scale_fill_manual(values = generate_palette(obs_gas_col, 
+                                              modification = "go_both_ways", 
+                                              n_colours = 6)[1:5]) +
+  ylim(c(-0.25, 0.05)) +
+  theme(plot.margin = unit(c(0, 0, 0, 0.5), "cm"))
+  
+finance_wellbeing_price_elast <- plot_grid(fin_wellbeing_elast_elec,
+                                           fin_wellbeing_elast_gas,
+                                           nrow = 1,
+                                           align = "h")
+
+```
+
+
+```{r include = TRUE, fig.height = 3.5, fig.width = 7}
+# Figure 3
+finance_wellbeing_price_elast
+```

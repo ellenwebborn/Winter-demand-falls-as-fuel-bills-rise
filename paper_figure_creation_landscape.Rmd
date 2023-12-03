@@ -1,0 +1,267 @@
+---
+date: "`r Sys.Date()`"
+author: "Your Name"
+title: "officedown template"
+output: 
+  officedown::rdocx_document:
+    mapstyles:
+      Normal: ['First Paragraph']
+---
+
+
+```{r setup, include=FALSE}
+# Script used to create figure 5 for the paper (see 'portrait' script for all other figures).
+
+knitr::opts_chunk$set(echo = FALSE, fig.cap = TRUE, dpi = 300, include = FALSE)
+library(officedown)
+library(officer)
+library(data.table)
+library(ggplot2)
+library(ggpubr)
+library(cowplot)
+library(monochromeR)
+library(stringr)
+library(RColorBrewer)
+
+myFont <- "serif"
+font.size = 13
+my_linewidth <- 0.8
+obs_elec_col <- "#8A51A5"
+pred_elec_col <- "#9AB4D6"
+obs_gas_col <- "#2072B1"
+pred_gas_col <- "#73C8BD"
+#change_col <- "#8C8C8C"
+savings_kWh_col_elec <- generate_palette(obs_elec_col, modification = "go_both_ways", 
+                                         n_colours = 6, view_palette = FALSE)[2]
+savings_perc_col_elec <- generate_palette(obs_elec_col, modification = "go_both_ways", 
+                                          n_colours = 6, view_palette = FALSE)[3]
+savings_kWh_col_gas <- generate_palette(obs_gas_col, modification = "go_both_ways", 
+                                        n_colours = 6, view_palette = FALSE)[2]
+savings_perc_col_gas <- generate_palette(obs_gas_col, modification = "go_both_ways", 
+                                         n_colours = 6, view_palette = FALSE)[3]
+
+cost_col_elec <- generate_palette(obs_elec_col, modification = "go_both_ways", 
+                                        n_colours = 6, view_palette = FALSE)[2:5]
+cost_col_gas <- generate_palette(obs_gas_col, modification = "go_both_ways", 
+                                        n_colours = 6, view_palette = FALSE)[2:5]
+cost_col_total <- generate_palette("tomato3", modification = "go_both_ways", 
+                                        n_colours = 6, view_palette = FALSE)[2:5]
+
+quintile_col <- generate_palette("darkolivegreen", modification = "go_both_ways", 
+                                        n_colours = 7, view_palette = FALSE)[2:6]
+popularity_col <- brewer.pal(8, "Dark2")[c(3, 1, 2, 6)]
+
+
+theme_set(theme_light(base_family = myFont))
+update_geom_defaults("text", list(family = theme_get()$text$family))
+```
+
+
+```{r rq4_action_popularity, eval = TRUE}
+
+rq4_action_popularity <- fread("./analysis_data/rq4_overall_action_popularity.csv")
+
+action_popularity_questions <-
+  data.table(
+    variable = c(paste0("A5_", 1:16),
+                 "A2", "A7"),
+    question = c(
+      "Switch off lights in unused rooms",
+      "Put more clothes on rather than more heating",
+      "Turn heating down/off when out",
+      "Use standalone heater rather than more heating",
+      "Use electric blanket/hot water bottle rather than more heating",
+      "Turn down radiators in unused rooms",
+      "Turn down radiators in used rooms",
+      "Run washing machine at full rather than part load",
+      "Run washing machine at 30 degrees or lower",
+      "Dry clothes without a tumble dryer",
+      "Turn appliances off standby when not in use",
+      "Close curtains/blinds at night",
+      "Shower rather than bath",
+      "Take short rather than long showers",
+      "Use dishwasher rather than washing up",
+      "Avoid using the cooker/oven for main meal",
+      "Any living spaces not normally heated*",
+      "Turn off the heating when absent for more than a day**"
+    )
+  )
+
+rq4_action_popularity <- action_popularity_questions[rq4_action_popularity,
+                                                     on = "variable"]
+
+rq4_action_popularity[perc > 60, popularity := "Very popular"]
+rq4_action_popularity[perc > 40 & perc <= 60, popularity := "Quite popular"]
+rq4_action_popularity[perc > 20 & perc <= 40, popularity := "Not very popular"]
+rq4_action_popularity[perc <= 20, popularity := "Very unpopular"]
+rq4_action_popularity[, popularity := factor(popularity,
+                                             levels = c("Very popular",
+                                                        "Quite popular",
+                                                        "Not very popular",
+                                                        "Very unpopular"))]
+
+```
+
+
+```{r actions_increased_by_quintile_with_risk}
+
+rq4_action_change_quintile_perc_orig <- fread("./analysis_data/rq4_behaviour_change_quintile_perc.csv")
+rq4_action_change_risk_ratios_orig <- fread("./analysis_data/rq4_behaviour_change_risk_ratios.csv")
+
+
+rq4_action_popularity_A6 <- copy(rq4_action_popularity)
+rq4_action_popularity_A6[, variable := str_replace(variable, "5_", "6_")]
+
+rq4_action_change_quintile_perc <- rq4_action_popularity_A6[, .(variable,
+                                                                question)
+                                                            ][rq4_action_change_quintile_perc_orig[variable != "A12"],                                                              on = "variable"]
+
+rq4_action_change_quintile_perc[variable == "A2", 
+                                `:=`(question = "Any living spaces not normally heated")]
+rq4_action_change_quintile_perc[variable == "A3", 
+                                `:=`(question = "Reduced boiler flow temperature")]
+rq4_action_change_quintile_perc[variable == "A4", 
+                                `:=`(question = "Heating house for fewer hours")]
+rq4_action_change_quintile_perc[variable == "A11", 
+                                `:=`(question = "Using smart meter IHD")]
+rq4_action_change_quintile_perc[variable == "A7", 
+                                `:=`(question = "Turn off the heating when absent for more than a day")]
+
+rq4_action_change_quintile_perc_all_low_high <-
+  rq4_action_change_quintile_perc[saving_perc_quintile %in% c(0, 1, 5)]
+rq4_action_change_quintile_perc_all_low_high[, perc := round(perc, 1)]
+
+rq4_action_change_quintile_perc_all_low_high <- dcast(rq4_action_change_quintile_perc_all_low_high,
+                                                      variable + question + 
+                                                        response ~ saving_perc_quintile,
+                                                      value.var = c("N", "perc"))
+setorder(rq4_action_change_quintile_perc_all_low_high,
+         cols = -perc_5)
+
+# format the columns
+rq4_action_change_table <- copy(rq4_action_change_quintile_perc_all_low_high)
+rq4_action_change_table[, `:=`(Quintile1 = paste0(perc_1, "% (", N_1, ")"),
+                               Sample = paste0(perc_0, "% (", N_0, ")"),
+                               Quintile5 = paste0(perc_5, "% (", N_5, ")"))]
+
+rq4_action_change_table <- rq4_action_change_table[, .(question,
+                                                       response,
+                                                       Quintile1,
+                                                       Sample,
+                                                       Quintile5)]
+
+# format risk ratios
+rq4_action_change_risk_ratios <- rq4_action_change_risk_ratios_orig[!is.na(lower)]
+rq4_action_change_risk_ratios[, RiskRatio := paste0(round(riskratio, 2), 
+                                                    " (", 
+                                                    round(lower, 2), 
+                                                    ",",
+                                                    round(upper, 2),
+                                                    ")")]
+rq4_action_change_risk_ratios[, p_value := round(p.value, 3)]
+
+
+# Plotting data
+rq4_risk_ratio_plotting_dt <- rq4_action_change_risk_ratios_orig[!is.na(lower) & 
+                                                                   variable != "A12"]
+rq4_risk_ratio_plotting_dt <- unique(rq4_action_change_quintile_perc[, .(variable, question)])[rq4_risk_ratio_plotting_dt,
+                                                              on = "variable"]
+
+setorder(rq4_risk_ratio_plotting_dt,
+         cols = riskratio)
+rq4_risk_ratio_plotting_dt[, plot_order := 1:nrow(rq4_risk_ratio_plotting_dt)]
+
+rq4_risk_ratio_plotting_dt <- rq4_action_popularity_A6[, .(variable, popularity)][
+  rq4_risk_ratio_plotting_dt, on = "variable"]
+
+rq4_action_change_quintile_perc <- rq4_risk_ratio_plotting_dt[, .(variable, plot_order)][rq4_action_change_quintile_perc, on = "variable"]
+
+rq4_action_change_quintile_perc <- rq4_action_popularity_A6[, .(variable, popularity)][
+  rq4_action_change_quintile_perc, on = "variable"]
+
+rq4_action_change_quintile_perc[, saving_perc_quintile := factor(saving_perc_quintile,
+                                                                 levels = c(1, 0, 2:5))]
+
+
+setnames(rq4_action_change_quintile_perc, "popularity", "Popularity")
+
+rq4_change_behaviours_points <- ggplot() + 
+  geom_line(data = rq4_action_change_quintile_perc[saving_perc_quintile %in% c(1, 5)],
+            aes(x = reorder(question, plot_order),
+                y = perc,
+                group = question,
+                colour = Popularity),
+            linewidth = 1.5) +
+  scale_colour_manual(values = popularity_col) +
+  geom_point(data = rq4_action_change_quintile_perc[saving_perc_quintile  %in% c(0, 1, 5)],
+             aes(x = reorder(question, plot_order),
+                 y = perc,
+                 fill = factor(saving_perc_quintile)),
+             size = 3,
+             shape = 21,
+             stroke = 0) +
+  scale_fill_manual(values = c(quintile_col[1],
+                               "white",
+                               quintile_col[5]),
+                    labels = c("Quintile 1",
+                               "All",
+                               "Quintile 5"),
+                    name = "Group") +
+  coord_flip() +
+  xlab(NULL) + 
+  ylab("% performing action \n'a lot more' than last winter") +
+  theme(legend.position = "none") +
+  theme(axis.text.y = element_blank()) + 
+  geom_text(data = rq4_action_change_quintile_perc[saving_perc_quintile == 5],
+            aes(x = reorder(question, plot_order),
+                y = perc,
+                label = round(perc)),
+            hjust = -0.5) + 
+  geom_text(data = rq4_action_change_quintile_perc[saving_perc_quintile == 1],
+            aes(x = reorder(question, plot_order),
+                y = perc,
+                label = round(perc)),
+            hjust = 1.5) + 
+  ylim(0, 100) +
+  theme(plot.margin = unit(c(0, 0, 0, 0), "cm"))
+
+# Risk ratios
+rq4_risk_ratios <- ggplot(rq4_risk_ratio_plotting_dt,
+                          aes(x = reorder(question, plot_order),
+                              y = riskratio,
+                              fill = popularity)) + 
+  scale_fill_manual(values = popularity_col) +
+  geom_bar(stat = "identity") + 
+  coord_flip() + 
+  xlab(NULL) + 
+  ylab("Risk ratio (relative 'risk' of quintile 5 \ntaking actions 'a lot more' compared to everyone else)") +
+  geom_text(aes(label = round(riskratio, 2)),
+            hjust = -0.2) + 
+  ylim(0, 4.5) +
+  theme(legend.position = "none") +
+  theme(plot.margin = unit(c(0, 0, 0, 0), "cm"))
+
+
+rq4_action_legend <- get_legend(rq4_change_behaviours_points +
+                                  theme(legend.position = "top"))
+
+rq4_action_changes_no_legend <- plot_grid(rq4_risk_ratios,
+                                          rq4_change_behaviours_points,
+                                          nrow = 1,
+                                          rel_widths = c(1.7, 1))
+
+rq4_action_changes <- plot_grid(rq4_action_legend,
+                                rq4_action_changes_no_legend,
+                                ncol = 1,
+                                rel_heights = c(1, 10))
+
+```
+
+
+<!---BLOCK_LANDSCAPE_START--->
+
+```{r include = TRUE, fig.height=5.6, fig.width = 10, eval=TRUE}
+rq4_action_changes
+```
+
+<!---BLOCK_LANDSCAPE_STOP--->
